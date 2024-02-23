@@ -1,0 +1,111 @@
+Enum "dataflows_sourceType_enum" {
+  "vehicle"
+  "infrastructure"
+}
+
+Enum "dataflows_dataflowDirection_enum" {
+  "download"
+  "upload"
+}
+
+Enum "dataflows_licenseGeolimit_enum" {
+  "local"
+  "edge"
+  "country"
+  "europe"
+  "world"
+}
+
+Table "dataflows" {
+  "dataflowId" integer [pk, increment]
+  "sourceId" varchar(255) [note: 'Identifier of the producing S&D']
+  "sourceType" dataflows_sourceType_enum [default: "vehicle"]
+  "dataflowDirection" dataflows_dataflowDirection_enum [default: "upload"]
+  "dataType" varchar(255) [not null, note: 'potential values: application, audio, cits, image, text, video']
+  "dataSubType" varchar(255) [not null, note: 'potential values: cam, denm, webrtc, jpeg...']
+  "dataFormat" varchar(255) [not null, note: 'potential values: json, asn1_jer, H264, mp4 ...']
+  "dataSampleRate" double [default: 0]
+  "licenseGeolimit" dataflows_licenseGeolimit_enum
+  "licenseType" varchar(255) [note: 'potential values: commercial, free...']
+  "locationQuadkey" varchar(20) [note: 'min size/zoom is 14 and max up to 18']
+  "locationLatitude" double [note: '7 decimal places for max precision']
+  "locationLongitude" double [note: '7 decimal places for max precision']
+  "locationCountry" varchar(3) [note: 'length of 3 if we want to use ISO 3166-1 alpha-3 country code']
+  "timeRegistration" bigint [note: 'UNIX timestamp in milliseconds']
+  "timeLastUpdate" bigint [note: 'UNIX timestamp in milliseconds']
+  "timeZone" tinyint [note: 'UTC timzones between -12 & +12']
+  "timeStratumLevel" tinyint [note: 'Stratum levels used by NTP protocol, min 1, max 15']
+  "extraAttributes" JSON
+  "counter" int [not null, default: 0]
+}
+
+Table "serviceOwners" {
+  "ownerId" varchar(255) [pk, note: 'possibility to generate a unique key by hashing the ownerName']
+  "ownerName" varchar(50) [unique, not null]
+  "aboutOwner" varchar(255)
+}
+
+Table "services" {
+  "serviceId" varchar(255) [pk, note: 'possibility to generate a unique key by hashing the sourceName']
+  "serviceName" varchar(50) [unique, not null]
+  "serviceType" varchar(255) [note: 'potential values: message-converter, data-sampler, video-compression']
+  "serviceBaseImage" varchar(255) [note: 'Name of the Image for the current service']
+  "serviceAttributes" JSON
+  "ownerId" varchar(255) [not null]
+  "isAnExternalService" bool
+  "aboutService" varchar(255)
+}
+
+Table "ccamApps" {
+  "ccamId" varchar(255) [pk]
+  "topics" varchar(255)
+  "portData" int
+  "portManagement" int
+  "processingId" int
+}
+
+Table "pipelines" {
+  "filterDataType" varchar(255) [pk]
+  "pipelineRules" JSON
+  "nbrModules" int [note: 'Total number of stages composing this pipeline, currently Max 10']
+  "slaId" int
+}
+
+Table "pipelineServices" {
+  "filterDataType" varchar(255)
+  "moduleNumber" int
+  "serviceId" varchar(255)
+
+Indexes {
+  (filterDataType, moduleNumber) [pk]
+}
+}
+
+Table "sla" {
+  "slaId" int [pk]
+  "samplerate" double
+  "framerate" double
+  "resolution" varchar(255)
+  "bitrate" double
+  "bitrate_unit" varchar(255)
+}
+
+Table "topics" {
+  "topicName" varchar(255) [not null] 
+  "dataType" varchar(255) [not null] 
+  "dataSubType" varchar(255) [default: null] 
+  "dataFormat" varchar(255) [default: null] 
+  "sourceId" varchar(255) [default: null] 
+  "sourceType" enum('vehicle','infrastructure') [default: null] 
+  "locationQuadkey" varchar(20) [default: null] 
+  "locationCountry" varchar(3) [default: null] 
+  "extraAttributes" json [default: null] 
+} 
+
+Ref:"serviceOwners"."ownerId" < "services"."ownerId"
+
+Ref:"pipelines"."filterDataType" < "pipelineServices"."filterDataType"
+
+Ref:"services"."serviceId" < "pipelineServices"."serviceId"
+
+Ref:"sla"."slaId" < "pipelines"."slaId"

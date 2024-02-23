@@ -1,0 +1,62 @@
+# A docker compose to create a MySql persistent database.
+# usefull guide: https://stavshamir.github.io/python/dockerizing-a-flask-mysql-app-with-docker-compose/
+
+version: '3'
+
+volumes:
+  db_data_cloud: #For DB persistent data
+ 
+services:
+  db:
+    image: mysql:8 
+    container_name: dataflow_cloud_db
+    
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: dataflow_db
+      MYSQL_USER: db_user
+      MYSQL_PASSWORD: db_password
+    ports:
+      - "6033:3306"
+    volumes:      
+      - "../utils/dataflow_utils/mysql/mysql.cnf:/etc/mysql/conf.d/mysql.cnf" #For allowing CSV import
+      - "./mysql/dataflow_DB_CLOUD_mysql.sql:/docker-entrypoint-initdb.d/schema.sql" #For DB schema
+      - "../utils/dataflow_utils/mysql/utilityTables_mysql.sql:/docker-entrypoint-initdb.d/utils.sql" # For additionnal utility tables
+      - db_data_cloud:/var/lib/mysql #For DB persistent data
+      - "../utils/dataflow_utils/countries_codes_iso.csv:/countries_codes_iso.csv" # For additionnal utility tables
+      - "../utils/dataflow_utils/known_dataflowtypes.csv:/known_dataflowtypes.csv" # For additionnal utility tables
+      # - "../examples/mysql/mysql_example.sql:/mysql_example.sql" #For our fictive example      
+      # - ./db:/docker-entrypoint-initdb.d/:ro # mage’s specification runs all .sql scripts in the given directory
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: dataflow_cloud_dbadmin
+    links:
+      - db
+    depends_on:
+      - db
+    environment:
+      PMA_HOST: dataflow_cloud_db
+      PMA_PORT: 3306
+      PMA_ARBITRARY: 1
+    restart: always
+    ports:
+      - 8888:80
+# Section to be incommented for disabling automatic startup of phpmyadmin
+    # profiles:
+      # - db_admin 
+
+# To be used separately with: docker-compose run dbml_cli sh -c "cd /home/sql_scripts/ && sh"
+  dbml_cli:
+    build: ../deploy/dbml_cli/
+    stdin_open: true # docker run -i
+    tty: true        # docker run -t
+    ports:
+      - 3000:3000
+    volumes:
+      - ./dataflow_DB_CLOUD.dbml:/home/sql_scripts/dataflow_DB_CLOUD.dbml
+      - ./mysql/:/home/sql_scripts/mysql/
+      - ./postgresql/:/home/sql_scripts/postgresql/
+    profiles: 
+      - with_dbml_cli
